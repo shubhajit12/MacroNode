@@ -5,7 +5,7 @@
 	"name": "MacroNode",
 	"description": "Client-side visual macro system: node-graph macro editor [E], config hub [O], high-priority key overriding, sub-tick executor, presets and Base64 share codes.",
 	"authors": [
-		"Shubh"
+		"ShubhTheGOAT"
 	],
 	"contact": {},
 	"license": "CC0-1.0",
