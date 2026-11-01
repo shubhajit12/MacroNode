@@ -1,0 +1,34 @@
+{
+	"schemaVersion": 1,
+	"id": "macronode",
+	"version": "${version}",
+	"name": "MacroNode",
+	"description": "Client-side visual macro system: node-graph macro editor [E], config hub [O], high-priority key overriding, sub-tick executor, presets and Base64 share codes.",
+	"authors": [
+		"Shubh"
+	],
+	"contact": {},
+	"license": "CC0-1.0",
+	"icon": "assets/macronode/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"main": [
+			"macronode.macro.MacroNode"
+		],
+		"client": [
+			"macronode.macro.client.MacroNodeClient"
+		]
+	},
+	"mixins": [
+		{
+			"config": "macronode.client.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	}
+}

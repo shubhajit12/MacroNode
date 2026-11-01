@@ -1,0 +1,18 @@
+{
+	"required": true,
+	"package": "macronode.macro.client.mixin",
+	"compatibilityLevel": "JAVA_21",
+	"client": [
+		"KeyboardHandlerMixin",
+		"MouseHandlerMixin",
+		"MinecraftMixin",
+		"MinecraftInvoker",
+		"KeyMappingAccessor"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}
