@@ -187,14 +187,14 @@ public final class MacroRecorder {
 	public enum EventType {
 		SLOT_CHANGE(SELECT_SLOT),
 		HOLD_START(null),
-		HOLD_END(USE_ITEM),
-		ATTACK(ATTACK),
-		USE_ITEM(USE_ITEM),
-		JUMP(JUMP),
-		SNEAK_PRESS(SNEAK),
-		SNEAK_RELEASE(SNEAK),
-		SPRINT_PRESS(SPRINT),
-		SPRINT_RELEASE(SPRINT);
+		HOLD_END(ActionType.USE_ITEM),
+		ATTACK(ActionType.ATTACK),
+		USE_ITEM(ActionType.USE_ITEM),
+		JUMP(ActionType.JUMP),
+		SNEAK_PRESS(ActionType.SNEAK),
+		SNEAK_RELEASE(ActionType.SNEAK),
+		SPRINT_PRESS(ActionType.SPRINT),
+		SPRINT_RELEASE(ActionType.SPRINT);
 
 		private final ActionType actionType;
 
