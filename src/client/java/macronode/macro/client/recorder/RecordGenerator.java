@@ -37,7 +37,7 @@ public final class RecordGenerator {
 
 		for (MacroRecorder.RecordedEvent event : events) {
 			// Calculate delay since last action
-			long delay = event.timestamp - lastTimestamp;
+			long delay = event.timestamp() - lastTimestamp;
 
 			// Insert Wait node if delay is significant (>50ms)
 			if (delay > 50 && lastBlock != null) {
@@ -57,7 +57,7 @@ public final class RecordGenerator {
 				lastBlock = actionBlock;
 			}
 
-			lastTimestamp = event.timestamp;
+			lastTimestamp = event.timestamp();
 		}
 
 		// Link blocks into profile
