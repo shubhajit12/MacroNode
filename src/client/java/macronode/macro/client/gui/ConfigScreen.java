@@ -359,7 +359,9 @@ public class ConfigScreen extends Screen {
 
 		// Event count display
 		int eventCount = recorder.getEvents().size();
-		addRenderableWidget(new DarkButton(cx, y, half, 18, lit("Events: " + eventCount), b -> {}).disabled(true));
+		DarkButton eventCountButton = new DarkButton(cx, y, half, 18, lit("Events: " + eventCount), b -> {});
+		eventCountButton.active = false;
+		addRenderableWidget(eventCountButton);
 		addRenderableWidget(new DarkButton(cx + half + 4, y, half, 18, lit("Clear Events"), b -> {
 			recorder.clearEvents();
 			setStatus("Events cleared", Theme.GRAY);
@@ -368,7 +370,7 @@ public class ConfigScreen extends Screen {
 		y += 30;
 
 		// Save to profile button
-		addRenderableWidget(new DarkButton(cx, y, cw, 18, lit("Save to Profile"), b -> {
+		DarkButton saveButton = new DarkButton(cx, y, cw, 18, lit("Save to Profile"), b -> {
 			if (eventCount == 0) {
 				setStatus("No events recorded", Theme.RED);
 				return;
@@ -379,7 +381,10 @@ public class ConfigScreen extends Screen {
 			setStatus("Saved as '" + profile.name + "'", Theme.MINT);
 			tab = lastTab = Tab.PROFILES;
 			rebuildWidgets();
-		}).accent(Theme.MINT).disabled(eventCount == 0));
+		});
+		saveButton.active = eventCount != 0;
+		saveButton.accent(Theme.MINT);
+		addRenderableWidget(saveButton);
 	}
 
 	private void renderRecord(GuiGraphics g) {
@@ -502,8 +507,8 @@ public class ConfigScreen extends Screen {
 		g.fill(px + 1, py + 22, px + pw - 1, py + 23, Theme.BORDER);
 		g.drawString(font, "MacroNode", px + 8, py + 8, Theme.WHITE, false);
 		g.drawString(font, "Config Hub", px + 10 + font.width("MacroNode"), py + 8, Theme.CYAN, false);
-		String info = ProfileStore.get().profiles().size() + " profiles  \u00B7  " + MacroEngine.get().runningCount() + " running"
-				+ (ProfileStore.get().settings().masterEnabled ? "" : "  \u00B7  DISABLED");
+		String info = ProfileStore.get().profiles().size() + " profiles  ·  " + MacroEngine.get().runningCount() + " running"
+				+ (ProfileStore.get().settings().masterEnabled ? "" : "  ·  DISABLED");
 		g.drawString(font, info, px + pw - 8 - font.width(info), py + 8,
 				ProfileStore.get().settings().masterEnabled ? Theme.GRAY : Theme.RED, false);
 		g.fill(px + 1, py + 23, px + 110, py + ph - 1, Theme.CARD);
