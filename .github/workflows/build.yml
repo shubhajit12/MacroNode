@@ -2,33 +2,36 @@ name: Build Fabric Mod
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ "**" ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ "**" ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Java
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v3
+
+      - name: Set up JDK 25 (Temurin)
         uses: actions/setup-java@v4
         with:
+          java-version: '25'
           distribution: 'temurin'
-          java-version: '21' # Minecraft 1.21.x requires Java 21
-          cache: 'gradle'
+          cache: gradle
 
-      - name: Grant Execute Permission for Gradle Wrapper
+      - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Mod with Gradle
+      - name: Build with Gradle
         run: ./gradlew build
 
-      - name: Upload Build Artifacts
+      - name: Upload compiled JAR artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mod-artifacts-${{ github.sha }}
+          name: mod-jar-java25
           path: build/libs/*.jar
