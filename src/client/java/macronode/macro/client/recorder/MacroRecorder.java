@@ -17,7 +17,6 @@ public final class MacroRecorder {
     private long recordingStartTime = 0L;
     private final List<RecordedEvent> events = new ArrayList<>();
 
-    // State snapshot tracking
     private int lastHotbarSlot = -1;
     private boolean lastSneaking = false;
     private boolean lastSprinting = false;
@@ -47,9 +46,9 @@ public final class MacroRecorder {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player != null) {
             lastHotbarSlot = mc.player.getInventory().getSelectedSlot();
-            lastSneaking = mc.player.input != null && mc.player.input.sneaking;
+            lastSneaking = mc.options.keyShift.isDown();
             lastSprinting = mc.player.isSprinting();
-            lastJumping = mc.player.input != null && mc.player.input.jumping;
+            lastJumping = mc.options.keyJump.isDown();
             lastUsingItem = mc.player.isUsingItem();
             lastSwinging = mc.player.swinging;
         }
@@ -92,13 +91,13 @@ public final class MacroRecorder {
         }
         lastHotbarSlot = currentSlot;
 
-        boolean jumping = player.input != null && player.input.jumping;
+        boolean jumping = mc.options.keyJump.isDown();
         if (jumping && !lastJumping) {
             events.add(new RecordedEvent(timestamp, EventType.JUMP, "", 0L));
         }
         lastJumping = jumping;
 
-        boolean sneaking = player.input != null && player.input.sneaking;
+        boolean sneaking = mc.options.keyShift.isDown();
         if (sneaking != lastSneaking) {
             if (sneaking) {
                 events.add(new RecordedEvent(timestamp, EventType.SNEAK_PRESS, "", 0L));
@@ -155,17 +154,15 @@ public final class MacroRecorder {
     }
 
     public void onKeyPress(int keyCode) {
-        // Recorder intentionally does not rely on raw GLFW key events.
-        // The proper capture path is END_CLIENT_TICK state snapshotting in pump().
+        // Recorder intentionally does not use raw GLFW key events.
     }
 
     public void onMousePress(int button) {
-        // Recorder intentionally does not rely on raw mouse callbacks.
-        // Attack/use item are determined from the in-game player state in pump().
+        // Recorder intentionally does not use raw mouse events.
     }
 
     public void onMouseRelease(int button) {
-        // Recorder intentionally does not rely on raw mouse callbacks.
+        // Recorder intentionally does not use raw mouse events.
     }
 
     public enum EventType {
