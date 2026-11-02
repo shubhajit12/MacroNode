@@ -1,212 +1,184 @@
 package macronode.macro.client.recorder;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
-import com.mojang.blaze3d.platform.InputConstants;
-import macronode.macro.client.action.ActionBlock;
-import macronode.macro.client.action.ActionType;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 
-import static macronode.macro.client.action.ActionType.*;
-
-/**
- * Captures player input during recording and converts it to ActionBlock chains.
- * Records hotbar changes, item usage, attacks, movement toggles, and optional look events.
- */
 public final class MacroRecorder {
-	private static final MacroRecorder INSTANCE = new MacroRecorder();
+    private static final MacroRecorder INSTANCE = new MacroRecorder();
 
-	public static MacroRecorder get() {
-		return INSTANCE;
-	}
+    public static MacroRecorder get() {
+        return INSTANCE;
+    }
 
-	private boolean recording = false;
-	private long recordingStartTime;
-	private final List<RecordedEvent> events = new ArrayList<>();
+    private boolean recording = false;
+    private long recordingStartTime = 0L;
+    private final List<RecordedEvent> events = new ArrayList<>();
 
-	// Track hold start times for duration calculation
-	private final Map<String, Long> holdStarts = new HashMap<>();
+    // State snapshot tracking
+    private int lastHotbarSlot = -1;
+    private boolean lastSneaking = false;
+    private boolean lastSprinting = false;
+    private boolean lastJumping = false;
+    private boolean lastUsingItem = false;
+    private boolean lastSwinging = false;
+    private Long useItemStartMs = null;
 
-	// State tracking
-	private int lastHotbarSlot = -1;
-	private boolean sneakToggled = false;
-	private boolean sprintToggled = false;
+    private MacroRecorder() {
+    }
 
-	private MacroRecorder() {
-	}
+    public void startRecording() {
+        if (recording) return;
 
-	public void startRecording() {
-		if (recording) return;
-		recording = true;
-		recordingStartTime = System.currentTimeMillis();
-		events.clear();
-		holdStarts.clear();
-		lastHotbarSlot = -1;
-		sneakToggled = false;
-		sprintToggled = false;
+        recording = true;
+        recordingStartTime = System.currentTimeMillis();
+        events.clear();
 
-		Minecraft mc = Minecraft.getInstance();
-		if (mc.player != null) {
-			lastHotbarSlot = mc.player.getInventory().getSelectedSlot();
-		}
-	}
+        lastHotbarSlot = -1;
+        lastSneaking = false;
+        lastSprinting = false;
+        lastJumping = false;
+        lastUsingItem = false;
+        lastSwinging = false;
+        useItemStartMs = null;
 
-	public void stopRecording() {
-		if (!recording) return;
-		recording = false;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player != null) {
+            lastHotbarSlot = mc.player.getInventory().getSelectedSlot();
+            lastSneaking = mc.player.input != null && mc.player.input.sneaking;
+            lastSprinting = mc.player.isSprinting();
+            lastJumping = mc.player.input != null && mc.player.input.jumping;
+            lastUsingItem = mc.player.isUsingItem();
+            lastSwinging = mc.player.swinging;
+        }
+    }
 
-		// End any active holds
-		for (Map.Entry<String, Long> entry : holdStarts.entrySet()) {
-			long duration = System.currentTimeMillis() - entry.getValue();
-			if (duration > 50) { // Only record holds longer than 50ms
-				events.add(new RecordedEvent(System.currentTimeMillis() - recordingStartTime,
-						EventType.HOLD_END, entry.getKey(), duration));
-			}
-		}
-		holdStarts.clear();
-	}
+    public void stopRecording() {
+        if (!recording) return;
 
-	public boolean isRecording() {
-		return recording;
-	}
+        finalizeUseItemIfNeeded();
+        recording = false;
+    }
 
-	public List<RecordedEvent> getEvents() {
-		return new ArrayList<>(events);
-	}
+    public boolean isRecording() {
+        return recording;
+    }
 
-	public void clearEvents() {
-		events.clear();
-	}
+    public List<RecordedEvent> getEvents() {
+        return new ArrayList<>(events);
+    }
 
-	// Called each client tick to check for state changes
-	public void pump() {
-		if (!recording) return;
+    public void clearEvents() {
+        events.clear();
+    }
 
-		Minecraft mc = Minecraft.getInstance();
-		LocalPlayer p = mc.player;
-		if (p == null) return;
+    public void pump() {
+        if (!recording) return;
 
-		long timestamp = System.currentTimeMillis() - recordingStartTime;
+        Minecraft mc = Minecraft.getInstance();
+        LocalPlayer player = mc.player;
+        if (player == null || mc.screen != null) {
+            return;
+        }
 
-		// Check hotbar slot change
-		int currentSlot = p.getInventory().getSelectedSlot();
-		if (currentSlot != lastHotbarSlot && lastHotbarSlot != -1) {
-			events.add(new RecordedEvent(timestamp, EventType.SLOT_CHANGE, String.valueOf(currentSlot), 0));
-			lastHotbarSlot = currentSlot;
-		}
+        long now = System.currentTimeMillis();
+        long timestamp = now - recordingStartTime;
 
-		// Check sneak toggle (key release)
-		if (sneakToggled && !mc.options.keyShift.isDown()) {
-			events.add(new RecordedEvent(timestamp, EventType.SNEAK_RELEASE, "", 0));
-			sneakToggled = false;
-		}
+        int currentSlot = player.getInventory().getSelectedSlot();
+        if (lastHotbarSlot != -1 && currentSlot != lastHotbarSlot) {
+            events.add(new RecordedEvent(timestamp, EventType.SLOT_CHANGE, String.valueOf(currentSlot), 0L));
+        }
+        lastHotbarSlot = currentSlot;
 
-		// Check sprint toggle (key release)
-		if (sprintToggled && !mc.options.keySprint.isDown()) {
-			events.add(new RecordedEvent(timestamp, EventType.SPRINT_RELEASE, "", 0));
-			sprintToggled = false;
-		}
-	}
+        boolean jumping = player.input != null && player.input.jumping;
+        if (jumping && !lastJumping) {
+            events.add(new RecordedEvent(timestamp, EventType.JUMP, "", 0L));
+        }
+        lastJumping = jumping;
 
-	// Input event hooks
-	public void onKeyPress(int keyCode) {
-		if (!recording) return;
+        boolean sneaking = player.input != null && player.input.sneaking;
+        if (sneaking != lastSneaking) {
+            if (sneaking) {
+                events.add(new RecordedEvent(timestamp, EventType.SNEAK_PRESS, "", 0L));
+            } else {
+                events.add(new RecordedEvent(timestamp, EventType.SNEAK_RELEASE, "", 0L));
+            }
+        }
+        lastSneaking = sneaking;
 
-		Minecraft mc = Minecraft.getInstance();
-		LocalPlayer p = mc.player;
-		if (p == null) return;
+        boolean sprinting = player.isSprinting();
+        if (sprinting != lastSprinting) {
+            if (sprinting) {
+                events.add(new RecordedEvent(timestamp, EventType.SPRINT_PRESS, "", 0L));
+            } else {
+                events.add(new RecordedEvent(timestamp, EventType.SPRINT_RELEASE, "", 0L));
+            }
+        }
+        lastSprinting = sprinting;
 
-		long timestamp = System.currentTimeMillis() - recordingStartTime;
+        boolean usingItem = player.isUsingItem();
+        if (usingItem && !lastUsingItem) {
+            useItemStartMs = now;
+        } else if (!usingItem && lastUsingItem && useItemStartMs != null) {
+            long duration = now - useItemStartMs;
+            if (duration > 0L) {
+                events.add(new RecordedEvent(timestamp, EventType.USE_ITEM, "", duration));
+            }
+            useItemStartMs = null;
+        }
+        lastUsingItem = usingItem;
 
-		// Check for hotbar keys (1-9)
-		if (keyCode >= InputConstants.KEY_1 && keyCode <= InputConstants.KEY_9) {
-			int slot = keyCode - InputConstants.KEY_1;
-			events.add(new RecordedEvent(timestamp, EventType.SLOT_CHANGE, String.valueOf(slot), 0));
-			lastHotbarSlot = slot;
-			return;
-		}
+        boolean swinging = player.swinging;
+        if (swinging && !lastSwinging) {
+            events.add(new RecordedEvent(timestamp, EventType.ATTACK, "", 0L));
+        }
+        lastSwinging = swinging;
+    }
 
-		// Sneak key
-		if (keyCode == InputConstants.KEY_LSHIFT || keyCode == InputConstants.KEY_RSHIFT) {
-			events.add(new RecordedEvent(timestamp, EventType.SNEAK_PRESS, "", 0));
-			sneakToggled = true;
-			return;
-		}
+    private void finalizeUseItemIfNeeded() {
+        if (useItemStartMs == null) return;
 
-		// Sprint key
-		if (keyCode == InputConstants.KEY_LCONTROL || keyCode == InputConstants.KEY_RCONTROL) {
-			events.add(new RecordedEvent(timestamp, EventType.SPRINT_PRESS, "", 0));
-			sprintToggled = true;
-			return;
-		}
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) {
+            useItemStartMs = null;
+            return;
+        }
 
-		// Jump key
-		if (keyCode == InputConstants.KEY_SPACE) {
-			events.add(new RecordedEvent(timestamp, EventType.JUMP, "", 0));
-			return;
-		}
-	}
+        long now = System.currentTimeMillis();
+        long duration = now - useItemStartMs;
+        if (duration > 0L) {
+            events.add(new RecordedEvent(now - recordingStartTime, EventType.USE_ITEM, "", duration));
+        }
+        useItemStartMs = null;
+    }
 
-	public void onMousePress(int button) {
-		if (!recording) return;
+    public void onKeyPress(int keyCode) {
+        // Recorder intentionally does not rely on raw GLFW key events.
+        // The proper capture path is END_CLIENT_TICK state snapshotting in pump().
+    }
 
-		long timestamp = System.currentTimeMillis() - recordingStartTime;
+    public void onMousePress(int button) {
+        // Recorder intentionally does not rely on raw mouse callbacks.
+        // Attack/use item are determined from the in-game player state in pump().
+    }
 
-		if (button == 0) { // Left click
-			events.add(new RecordedEvent(timestamp, EventType.ATTACK, "", 0));
-		} else if (button == 1) { // Right click
-			String key = "USE_ITEM";
-			holdStarts.put(key, System.currentTimeMillis());
-			events.add(new RecordedEvent(timestamp, EventType.HOLD_START, key, 0));
-		}
-	}
+    public void onMouseRelease(int button) {
+        // Recorder intentionally does not rely on raw mouse callbacks.
+    }
 
-	public void onMouseRelease(int button) {
-		if (!recording) return;
+    public enum EventType {
+        SLOT_CHANGE,
+        ATTACK,
+        JUMP,
+        SNEAK_PRESS,
+        SNEAK_RELEASE,
+        SPRINT_PRESS,
+        SPRINT_RELEASE,
+        USE_ITEM
+    }
 
-		long timestamp = System.currentTimeMillis() - recordingStartTime;
-
-		if (button == 1) { // Right click release
-			String key = "USE_ITEM";
-			Long start = holdStarts.remove(key);
-			if (start != null) {
-				long duration = System.currentTimeMillis() - start;
-				if (duration > 50) {
-					events.add(new RecordedEvent(timestamp, EventType.HOLD_END, key, duration));
-				} else {
-					events.add(new RecordedEvent(timestamp, EventType.USE_ITEM, "", 0));
-				}
-			}
-		}
-	}
-
-	public enum EventType {
-		SLOT_CHANGE(SELECT_SLOT),
-		HOLD_START(null),
-		HOLD_END(ActionType.USE_ITEM),
-		ATTACK(ActionType.ATTACK),
-		USE_ITEM(ActionType.USE_ITEM),
-		JUMP(ActionType.JUMP),
-		SNEAK_PRESS(ActionType.SNEAK),
-		SNEAK_RELEASE(ActionType.SNEAK),
-		SPRINT_PRESS(ActionType.SPRINT),
-		SPRINT_RELEASE(ActionType.SPRINT);
-
-		private final ActionType actionType;
-
-		EventType(ActionType actionType) {
-			this.actionType = actionType;
-		}
-
-		public ActionType toActionType() {
-			return actionType;
-		}
-	}
-
-	public record RecordedEvent(long timestamp, EventType type, String data, long duration) {
-	}
+    public record RecordedEvent(long timestamp, EventType type, String data, long duration) {
+    }
 }
