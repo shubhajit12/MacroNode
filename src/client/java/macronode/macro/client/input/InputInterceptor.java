@@ -11,19 +11,12 @@ import macronode.macro.client.engine.HeldKeys;
 import macronode.macro.client.engine.MacroEngine;
 import macronode.macro.client.gui.ConfigScreen;
 import macronode.macro.client.gui.MacroEditorScreen;
-import macronode.macro.client.recorder.MacroRecorder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.input.KeyEvent;
 
 /**
  * Decides whether a raw key/mouse event triggers a macro and whether vanilla should see it.
- * <p>
- * Matching: a profile matches when its LAST key equals the event key and every earlier key
- * (modifiers / chord keys) is currently held. If several profiles match (e.g. "1" and "Ctrl + 1")
- * the most specific (longest) chord wins. Left/right Ctrl, Shift, Alt and Super are interchangeable.
- * <p>
- * Override: if the winning profile has overrideNative, the PRESS, REPEAT and RELEASE of the
- * activator key are all swallowed, so e.g. "2" will not select hotbar slot 2.
+ * The recorder itself no longer consumes raw GLFW events; it uses state-snapshot monitoring.
  */
 public final class InputInterceptor {
 	private static final Map<Integer, Integer> MOD_TWIN = Map.of(
@@ -43,21 +36,11 @@ public final class InputInterceptor {
 		return mc.screen == null && mc.player != null && mc.getOverlay() == null;
 	}
 
-	/** @return true to cancel the vanilla key handling. */
 	public static boolean onKey(int action, KeyEvent event) {
 		Minecraft mc = Minecraft.getInstance();
 		if (!inGame(mc)) return false;
 
-		// Feed recorder before any macro handling
-		if (MacroRecorder.get().isRecording()) {
-			if (action == InputConstants.PRESS) {
-				InputConstants.Key key = InputConstants.getKey(event);
-				MacroRecorder.get().onKeyPress(key.getValue());
-			}
-		}
-
 		if (action == InputConstants.PRESS) {
-			// MacroNode's own hotkeys also take priority (E would otherwise open the vanilla inventory).
 			if (MacroNodeClient.OPEN_CONFIG.matches(event)) {
 				mc.setScreen(new ConfigScreen(null));
 				return true;
@@ -74,20 +57,9 @@ public final class InputInterceptor {
 		return handle(InputConstants.getKey(event), action);
 	}
 
-	/** @return true to cancel the vanilla mouse button handling. */
 	public static boolean onMouse(int button, int action) {
 		Minecraft mc = Minecraft.getInstance();
 		if (!inGame(mc)) return false;
-
-		// Feed recorder before any macro handling
-		if (MacroRecorder.get().isRecording()) {
-			if (action == InputConstants.PRESS) {
-				MacroRecorder.get().onMousePress(button);
-			} else if (action == InputConstants.RELEASE) {
-				MacroRecorder.get().onMouseRelease(button);
-			}
-		}
-
 		return handle(InputConstants.Type.MOUSE.getOrCreate(button), action);
 	}
 
